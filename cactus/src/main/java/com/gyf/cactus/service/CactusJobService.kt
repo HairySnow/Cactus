@@ -53,7 +53,11 @@ class CactusJobService : JobService() {
 
     override fun onDestroy() {
         stopForeground(true)
-        mJobScheduler.cancel(mJobId)
+        try {
+            mJobScheduler.cancel(mJobId)
+        } catch (e: Exception) {
+            log("cancel Job failed: " + e.message)
+        }
         saveJobId(-1)
         super.onDestroy()
     }
@@ -78,33 +82,37 @@ class CactusJobService : JobService() {
      * 开始Job
      */
     private fun registerJob() {
-        mJobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        mJobId = getJobId()
-        if (mJobId != -1) {
-            mJobScheduler.cancel(mJobId)
-        }
-        mJobId = id
-        saveJobId(mJobId)
-        val builder = JobInfo.Builder(
-            mJobId,
-            ComponentName(packageName, CactusJobService::class.java.name)
-        ).apply {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                setMinimumLatency(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS) //执行的最小延迟时间
-                setOverrideDeadline(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)  //执行的最长延时时间
-                setMinimumLatency(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
-                setBackoffCriteria(
-                    JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS,
-                    JobInfo.BACKOFF_POLICY_LINEAR
-                )//线性重试方案
-            } else {
-                setPeriodic(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
-                setRequiresDeviceIdle(true)
+        try {
+            mJobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+            mJobId = getJobId()
+            if (mJobId != -1) {
+                mJobScheduler.cancel(mJobId)
             }
-            setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-            setRequiresCharging(true) // 当插入充电器，执行该任务
-            setPersisted(true)
+            mJobId = id
+            saveJobId(mJobId)
+            val builder = JobInfo.Builder(
+                mJobId,
+                ComponentName(packageName, CactusJobService::class.java.name)
+            ).apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    setMinimumLatency(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS) //执行的最小延迟时间
+                    setOverrideDeadline(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)  //执行的最长延时时间
+                    setMinimumLatency(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
+                    setBackoffCriteria(
+                        JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS,
+                        JobInfo.BACKOFF_POLICY_LINEAR
+                    )//线性重试方案
+                } else {
+                    setPeriodic(JobInfo.DEFAULT_INITIAL_BACKOFF_MILLIS)
+                    setRequiresDeviceIdle(true)
+                }
+                setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                setRequiresCharging(true) // 当插入充电器，执行该任务
+                setPersisted(true)
+            }
+            mJobScheduler.schedule(builder.build())
+        } catch (e: Exception) {
+            log("register Job failed: " + e.message)
         }
-        mJobScheduler.schedule(builder.build())
     }
 }
